@@ -1,0 +1,22 @@
+# Rust
+/target
+
+# RustRover
+/.idea
+
+# Certificates, keys, containers, ...
+**/*.ca-bundle
+**/*.cer
+**/*.crt
+**/*.jks
+**/*.key
+**/*.keystore
+**/*.p12
+**/*.p7b
+**/*.p7c
+**/*.p7s
+**/*.pem
+**/*.pem
+**/*.pfx
+
+/private
