@@ -4,7 +4,7 @@ A tool to generate a three-tier PKI with zones separated by [Name Constraints](h
 
 This architecture allows efficient zone revocation and reduces the severity of a key compromise:
 If an intermediate key is compromised, the damage is limited to a specific zone.
-If the root key is compromised, the damage is limited to `**.example.org`.
+If the root key is compromised, the damage is limited to a specific domain.
 
 ## Overview
 
