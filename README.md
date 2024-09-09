@@ -6,6 +6,21 @@ This architecture allows efficient zone revocation and reduces the severity of a
 If an intermediate key is compromised, the damage is limited to a specific zone.
 If the root key is compromised, the damage is limited to a specific domain.
 
+```text
+Usage: mkpki [--seed <seed>] <command> [<args>]
+
+mkpki.
+
+Options:
+  --seed            ONLY FOR TESTING: seed CSPRNG with `sha256(argument)`
+  --help            display usage information
+
+Commands:
+  root              Create root certificate.
+  intermediate      Create intermediate certificate.
+  leaf              Create leaf certificate.
+```
+
 ## Overview
 
 ```mermaid
