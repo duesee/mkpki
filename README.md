@@ -1,6 +1,6 @@
 # mkpki
 
-A tool to generate a three-tier PKI with zones separated by [Name Constraints](https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.10).
+A tool to generate a two-tier PKI with zones separated by [Name Constraints](https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.10).
 
 This architecture allows efficient zone revocation and reduces the severity of a key compromise:
 If an intermediate key is compromised, the damage is limited to a specific zone.
