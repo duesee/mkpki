@@ -1,54 +1,56 @@
-use std::{borrow::Cow, collections::BTreeSet};
+use std::borrow::Cow;
 
 use bitvec::prelude::*;
-use bytes::Bytes;
 use chrono::{Local, TimeDelta};
-use num_bigint::Sign;
-use num_traits::ops::bytes::FromBytes;
 use rand::{CryptoRng, Rng};
 use rasn::{
     der::encode,
-    types::{Any, BitString, Ia5String, Integer, ObjectIdentifier, Open::Null, PrintableString},
+    types::{
+        Any, BitString, Ia5String, Integer, IntegerType, ObjectIdentifier, OctetString, Open::Null,
+        PrintableString, SetOf,
+    },
 };
 use rasn_pkix::{
     AlgorithmIdentifier, AttributeTypeAndValue, AuthorityKeyIdentifier, BasicConstraints,
     Certificate, CertificateSerialNumber, ExtKeyUsageSyntax, Extension, GeneralName,
-    GeneralSubtree, Name, NameConstraints, SubjectAltName, SubjectPublicKeyInfo, TbsCertificate,
-    Time, Validity, Version,
+    GeneralSubtree, Name, NameConstraints, RelativeDistinguishedName, SubjectAltName,
+    SubjectPublicKeyInfo, TbsCertificate, Time, Validity, Version,
 };
 use rsa::{traits::PublicKeyParts, Pkcs1v15Sign, RsaPrivateKey};
 use sha2::{Digest, Sha256};
 
 use crate::gen_key;
 
-const COUNTRY_NAME: ObjectIdentifier =
+pub const COUNTRY_NAME: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 4, 6]));
-const ORGANIZATION_NAME: ObjectIdentifier =
+pub const ORGANIZATION_NAME: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 4, 10]));
-const COMMON_NAME: ObjectIdentifier = ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 4, 3]));
-const KEY_USAGE: ObjectIdentifier = ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 29, 15]));
-const EXT_KEY_USAGE: ObjectIdentifier =
+pub const COMMON_NAME: ObjectIdentifier =
+    ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 4, 3]));
+pub const KEY_USAGE: ObjectIdentifier =
+    ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 29, 15]));
+pub const EXT_KEY_USAGE: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 29, 37]));
-const SERVER_AUTH: ObjectIdentifier =
+pub const SERVER_AUTH: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[1, 3, 6, 1, 5, 5, 7, 3, 1]));
-const CLIENT_AUTH: ObjectIdentifier =
+pub const CLIENT_AUTH: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[1, 3, 6, 1, 5, 5, 7, 3, 2]));
-const BASIC_CONSTRAINTS: ObjectIdentifier =
+pub const BASIC_CONSTRAINTS: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 29, 19]));
-const SUBJECT_KEY_IDENTIFIER: ObjectIdentifier =
+pub const SUBJECT_KEY_IDENTIFIER: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 29, 14]));
-const AUTHORITY_KEY_IDENTIFIER: ObjectIdentifier =
+pub const AUTHORITY_KEY_IDENTIFIER: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 29, 35]));
-const SUBJECT_ALT_NAME: ObjectIdentifier =
+pub const SUBJECT_ALT_NAME: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 29, 17]));
-const RSA_ENCRYPTION: ObjectIdentifier =
+pub const RSA_ENCRYPTION: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[1, 2, 840, 113549, 1, 1, 1]));
-const SHA_256_WITH_RSA_ENCRYPTION: ObjectIdentifier =
+pub const SHA_256_WITH_RSA_ENCRYPTION: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[1, 2, 840, 113549, 1, 1, 11]));
-const NAME_CONSTRAINTS: ObjectIdentifier =
+pub const NAME_CONSTRAINTS: ObjectIdentifier =
     ObjectIdentifier::new_unchecked(Cow::Borrowed(&[2, 5, 29, 30]));
 
-#[derive(Debug, rasn::AsnType, rasn::Encode, rasn::Decode)]
+#[derive(Debug, rasn::AsnType, rasn::Encode)]
 struct RsaPubKey {
     n: Integer,
     e: Integer,
@@ -73,38 +75,40 @@ pub fn gen_root<R: CryptoRng + Rng>(
                 }
             };
 
-            let subject = {
-                Name::RdnSequence(vec![
-                    BTreeSet::from([AttributeTypeAndValue {
-                        r#type: COUNTRY_NAME,
-                        value: Any::new(
-                            encode(&PrintableString::from_bytes(country_name).unwrap()).unwrap(),
-                        ),
-                    }])
-                    .into(),
-                    BTreeSet::from([AttributeTypeAndValue {
-                        r#type: ORGANIZATION_NAME,
-                        value: Any::new(
-                            encode(&PrintableString::from_bytes(organization_name).unwrap())
-                                .unwrap(),
-                        ),
-                    }])
-                    .into(),
-                    BTreeSet::from([AttributeTypeAndValue {
-                        r#type: COMMON_NAME,
-                        value: Any::new(
-                            encode(&PrintableString::from_bytes(common_name).unwrap()).unwrap(),
-                        ),
-                    }])
-                    .into(),
-                ])
-            };
+            let subject = Name::RdnSequence(vec![
+                RelativeDistinguishedName::from(SetOf::from(vec![AttributeTypeAndValue {
+                    r#type: COUNTRY_NAME,
+                    value: Any::new(
+                        encode(&PrintableString::from_bytes(country_name).unwrap()).unwrap(),
+                    ),
+                }])),
+                RelativeDistinguishedName::from(SetOf::from(vec![AttributeTypeAndValue {
+                    r#type: ORGANIZATION_NAME,
+                    value: Any::new(
+                        encode(&PrintableString::from_bytes(organization_name).unwrap()).unwrap(),
+                    ),
+                }])),
+                RelativeDistinguishedName::from(SetOf::from(vec![AttributeTypeAndValue {
+                    r#type: COMMON_NAME,
+                    value: Any::new(
+                        encode(&PrintableString::from_bytes(common_name).unwrap()).unwrap(),
+                    ),
+                }])),
+            ]);
 
             let subject_public_key = {
                 let pk = {
                     RsaPubKey {
-                        n: Integer::from_bytes_be(Sign::Plus, &pk.n().to_bytes_be()),
-                        e: Integer::from_bytes_be(Sign::Plus, &pk.e().to_bytes_be()),
+                        n: Integer::try_from_unsigned_bytes(
+                            &pk.n().to_bytes_be(),
+                            rasn::Codec::Der,
+                        )
+                        .unwrap(),
+                        e: Integer::try_from_unsigned_bytes(
+                            &pk.e().to_bytes_be(),
+                            rasn::Codec::Der,
+                        )
+                        .unwrap(),
                     }
                 };
 
@@ -118,14 +122,18 @@ pub fn gen_root<R: CryptoRng + Rng>(
                     hasher.finalize()
                 };
 
-                Bytes::from(hash.to_vec())
+                OctetString::from(hash.to_vec())
             };
 
             let key_usage = bitvec![u8, Msb0; 0, 0, 0, 0, 0, 1, 1];
 
             TbsCertificate {
                 version: Version::V3,
-                serial_number: CertificateSerialNumber::from_be_bytes(&rng.gen::<[u8; 16]>()),
+                serial_number: CertificateSerialNumber::try_from_bytes(
+                    &rng.r#gen::<[u8; 16]>(),
+                    rasn::Codec::Der,
+                )
+                .unwrap(),
                 signature: AlgorithmIdentifier {
                     algorithm: SHA_256_WITH_RSA_ENCRYPTION,
                     parameters: Some(Any::new(encode(&Null).unwrap())),
@@ -148,7 +156,7 @@ pub fn gen_root<R: CryptoRng + Rng>(
                         Extension {
                             extn_id: KEY_USAGE,
                             critical: true,
-                            extn_value: Bytes::from(encode(&key_usage).unwrap()),
+                            extn_value: OctetString::from(encode(&key_usage).unwrap()),
                         },
                         Extension {
                             extn_id: BASIC_CONSTRAINTS,
@@ -163,12 +171,12 @@ pub fn gen_root<R: CryptoRng + Rng>(
                         Extension {
                             extn_id: SUBJECT_KEY_IDENTIFIER,
                             critical: false,
-                            extn_value: Bytes::from(encode(&skid).unwrap()),
+                            extn_value: OctetString::from(encode(&skid).unwrap()),
                         },
                         Extension {
                             extn_id: NAME_CONSTRAINTS,
                             critical: true,
-                            extn_value: Bytes::from(
+                            extn_value: OctetString::from(
                                 encode(&NameConstraints {
                                     permitted_subtrees: Some(vec![GeneralSubtree {
                                         base: GeneralName::DnsName(
@@ -228,34 +236,39 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
             };
 
             let subject = Name::RdnSequence(vec![
-                BTreeSet::from([AttributeTypeAndValue {
+                RelativeDistinguishedName::from(SetOf::from(vec![AttributeTypeAndValue {
                     r#type: COUNTRY_NAME,
                     value: Any::new(
                         encode(&PrintableString::from_bytes(country_name).unwrap()).unwrap(),
                     ),
-                }])
-                .into(),
-                BTreeSet::from([AttributeTypeAndValue {
+                }])),
+                RelativeDistinguishedName::from(SetOf::from(vec![AttributeTypeAndValue {
                     r#type: ORGANIZATION_NAME,
                     value: Any::new(
                         encode(&PrintableString::from_bytes(organization_name).unwrap()).unwrap(),
                     ),
-                }])
-                .into(),
-                BTreeSet::from([AttributeTypeAndValue {
+                }])),
+                RelativeDistinguishedName::from(SetOf::from(vec![AttributeTypeAndValue {
                     r#type: COMMON_NAME,
                     value: Any::new(
                         encode(&PrintableString::from_bytes(common_name).unwrap()).unwrap(),
                     ),
-                }])
-                .into(),
+                }])),
             ]);
 
             let subject_public_key = {
                 let pk = {
                     RsaPubKey {
-                        n: Integer::from_bytes_be(Sign::Plus, &pk.n().to_bytes_be()),
-                        e: Integer::from_bytes_be(Sign::Plus, &pk.e().to_bytes_be()),
+                        n: Integer::try_from_unsigned_bytes(
+                            &pk.n().to_bytes_be(),
+                            rasn::Codec::Der,
+                        )
+                        .unwrap(),
+                        e: Integer::try_from_unsigned_bytes(
+                            &pk.e().to_bytes_be(),
+                            rasn::Codec::Der,
+                        )
+                        .unwrap(),
                     }
                 };
 
@@ -277,7 +290,7 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
                     hasher.finalize()
                 };
 
-                Bytes::from(hash.to_vec())
+                OctetString::from(hash.to_vec())
             };
 
             let skid = {
@@ -287,7 +300,7 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
                     hasher.finalize()
                 };
 
-                Bytes::from(hash.to_vec())
+                OctetString::from(hash.to_vec())
             };
 
             // TODO: Minimize?
@@ -295,7 +308,11 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
 
             TbsCertificate {
                 version: Version::V3,
-                serial_number: CertificateSerialNumber::from_be_bytes(&rng.gen::<[u8; 16]>()),
+                serial_number: CertificateSerialNumber::try_from_bytes(
+                    &rng.r#gen::<[u8; 16]>(),
+                    rasn::Codec::Der,
+                )
+                .unwrap(),
                 signature: AlgorithmIdentifier {
                     algorithm: SHA_256_WITH_RSA_ENCRYPTION,
                     parameters: Some(Any::new(encode(&Null).unwrap())),
@@ -317,7 +334,7 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
                         Extension {
                             extn_id: KEY_USAGE,
                             critical: true,
-                            extn_value: Bytes::from(encode(&key_usage).unwrap()),
+                            extn_value: OctetString::from(encode(&key_usage).unwrap()),
                         },
                         Extension {
                             extn_id: EXT_KEY_USAGE,
@@ -343,12 +360,12 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
                         Extension {
                             extn_id: SUBJECT_KEY_IDENTIFIER,
                             critical: false,
-                            extn_value: Bytes::from(encode(&skid).unwrap()),
+                            extn_value: OctetString::from(encode(&skid).unwrap()),
                         },
                         Extension {
                             extn_id: AUTHORITY_KEY_IDENTIFIER,
                             critical: false,
-                            extn_value: Bytes::from(
+                            extn_value: OctetString::from(
                                 encode(&AuthorityKeyIdentifier {
                                     key_identifier: Some(akid),
                                     authority_cert_issuer: None,
@@ -363,7 +380,7 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
                         Extension {
                             extn_id: NAME_CONSTRAINTS,
                             critical: true,
-                            extn_value: Bytes::from(
+                            extn_value: OctetString::from(
                                 encode(&NameConstraints {
                                     permitted_subtrees: Some(vec![GeneralSubtree {
                                         base: GeneralName::DnsName(
@@ -423,17 +440,30 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                 }
             };
 
-            let subject = Name::RdnSequence(vec![BTreeSet::from([AttributeTypeAndValue {
-                r#type: COMMON_NAME,
-                value: Any::new(encode(&PrintableString::from_bytes(domain).unwrap()).unwrap()),
-            }])
-            .into()]);
+            let subject =
+                Name::RdnSequence(vec![RelativeDistinguishedName::from(SetOf::from(vec![
+                    AttributeTypeAndValue {
+                        r#type: rasn::types::Oid::JOINT_ISO_ITU_T_DS_ATTRIBUTE_TYPE_COMMON_NAME
+                            .into(),
+                        value: Any::new(
+                            encode(&PrintableString::from_bytes(domain).unwrap()).unwrap(),
+                        ),
+                    },
+                ]))]);
 
             let subject_public_key = {
                 let pk = {
                     RsaPubKey {
-                        n: Integer::from_bytes_be(Sign::Plus, &pk.n().to_bytes_be()),
-                        e: Integer::from_bytes_be(Sign::Plus, &pk.e().to_bytes_be()),
+                        n: Integer::try_from_unsigned_bytes(
+                            &pk.n().to_bytes_be(),
+                            rasn::Codec::Der,
+                        )
+                        .unwrap(),
+                        e: Integer::try_from_unsigned_bytes(
+                            &pk.e().to_bytes_be(),
+                            rasn::Codec::Der,
+                        )
+                        .unwrap(),
                     }
                 };
 
@@ -455,7 +485,7 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                     hasher.finalize()
                 };
 
-                Bytes::from(hash.to_vec())
+                OctetString::from(hash.to_vec())
             };
 
             let skid = {
@@ -465,14 +495,18 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                     hasher.finalize()
                 };
 
-                Bytes::from(hash.to_vec())
+                OctetString::from(hash.to_vec())
             };
 
             let key_usage = bitvec![u8, Msb0; 1];
 
             TbsCertificate {
                 version: Version::V3,
-                serial_number: CertificateSerialNumber::from_be_bytes(&rng.gen::<[u8; 16]>()),
+                serial_number: CertificateSerialNumber::try_from_bytes(
+                    &rng.r#gen::<[u8; 16]>(),
+                    rasn::Codec::Der,
+                )
+                .unwrap(),
                 signature: AlgorithmIdentifier {
                     algorithm: SHA_256_WITH_RSA_ENCRYPTION,
                     parameters: Some(Any::new(encode(&Null).unwrap())),
@@ -494,7 +528,7 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                         Extension {
                             extn_id: KEY_USAGE,
                             critical: true,
-                            extn_value: Bytes::from(encode(&key_usage).unwrap()),
+                            extn_value: OctetString::from(encode(&key_usage).unwrap()),
                         },
                         Extension {
                             extn_id: EXT_KEY_USAGE,
@@ -519,12 +553,12 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                         Extension {
                             extn_id: SUBJECT_KEY_IDENTIFIER,
                             critical: false,
-                            extn_value: Bytes::from(encode(&skid).unwrap()),
+                            extn_value: OctetString::from(encode(&skid).unwrap()),
                         },
                         Extension {
                             extn_id: AUTHORITY_KEY_IDENTIFIER,
                             critical: false,
-                            extn_value: Bytes::from(
+                            extn_value: OctetString::from(
                                 encode(&AuthorityKeyIdentifier {
                                     key_identifier: Some(akid),
                                     authority_cert_issuer: None,
@@ -537,7 +571,7 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                         Extension {
                             extn_id: SUBJECT_ALT_NAME,
                             critical: false,
-                            extn_value: Bytes::from(
+                            extn_value: OctetString::from(
                                 encode(&SubjectAltName::from([GeneralName::DnsName(
                                     Ia5String::from_iso646_bytes(domain).unwrap(),
                                 )]))
