@@ -31,7 +31,7 @@ pub fn save_key<P: AsRef<Path>>(sk: &RsaPrivateKey, format: Format, path: P) {
         }
         Format::Pem => {
             let data = pem_rfc7468::encode_string(
-                "PRIVATE KEY",
+                "RSA PRIVATE KEY",
                 LineEnding::LF,
                 sk.to_pkcs1_der().unwrap().as_bytes(),
             )
@@ -53,7 +53,7 @@ pub fn load_key<P: AsRef<Path>>(format: Format, path: P) -> RsaPrivateKey {
         Format::Pem => {
             let data = std::fs::read(path).unwrap();
             let (type_label, data) = pem_rfc7468::decode_vec(&data).unwrap();
-            assert_eq!(type_label, "PRIVATE KEY");
+            assert_eq!(type_label, "RSA PRIVATE KEY");
             RsaPrivateKey::from_pkcs1_der(&data).unwrap()
         }
     }
