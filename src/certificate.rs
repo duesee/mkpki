@@ -221,6 +221,7 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
     country_name: &[u8],
     organization_name: &[u8],
     common_name: &[u8],
+    name_constraint: &[u8],
 ) -> (RsaPrivateKey, Certificate) {
     let (sk, pk) = gen_key(rng, 4096);
 
@@ -384,11 +385,7 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
                                 encode(&NameConstraints {
                                     permitted_subtrees: Some(vec![GeneralSubtree {
                                         base: GeneralName::DnsName(
-                                            // TODO
-                                            Ia5String::from_iso646_bytes(
-                                                b"intermediate.example.org",
-                                            )
-                                            .unwrap(),
+                                            Ia5String::from_iso646_bytes(name_constraint).unwrap(),
                                         ),
                                         minimum: Default::default(),
                                         maximum: None,

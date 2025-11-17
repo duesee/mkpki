@@ -58,6 +58,9 @@ struct Intermediate {
     /// commonName
     #[argh(positional)]
     common_name: String,
+    /// nameConstraint
+    #[argh(positional)]
+    name_constraint: String,
 }
 
 /// Create leaf certificate.
@@ -107,6 +110,7 @@ fn main() {
             country_name,
             organization_name,
             common_name,
+            name_constraint,
         }) => {
             let root_key = load_key(Format::Pem, root_key_path);
             let root_cert = load_cert(Format::Pem, root_cert_path);
@@ -118,6 +122,7 @@ fn main() {
                 country_name.as_bytes(),
                 organization_name.as_bytes(),
                 common_name.as_bytes(),
+                name_constraint.as_bytes(),
             );
 
             save_key(&intermediate_key, Format::Pem, "intermediate-key.pem");
