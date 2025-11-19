@@ -326,7 +326,6 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
                             critical: false,
                             // TODO: Minimize?
                             extn_value: encode(&ExtKeyUsageSyntax::from(&[
-                                CLIENT_AUTH,
                                 SERVER_AUTH,
                             ]))
                             .unwrap()
@@ -516,7 +515,6 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                             critical: false,
                             extn_value: encode(&ExtKeyUsageSyntax::from(&[
                                 SERVER_AUTH,
-                                CLIENT_AUTH,
                             ]))
                             .unwrap()
                             .into(),
