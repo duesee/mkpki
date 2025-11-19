@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, net::Ipv4Addr, str::FromStr};
 
 use bitvec::prelude::*;
 use chrono::{Local, SubsecRound, TimeDelta};
@@ -404,7 +404,7 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
     rng: &mut R,
     intermediate_key: &RsaPrivateKey,
     intermediate_cert: &Certificate,
-    domain: &[u8],
+    ipv4_or_domain_domain: &[u8],
 ) -> (RsaPrivateKey, Certificate) {
     let (sk, pk) = gen_key(rng, 2048);
 
@@ -416,7 +416,8 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                         r#type: rasn::types::Oid::JOINT_ISO_ITU_T_DS_ATTRIBUTE_TYPE_COMMON_NAME
                             .into(),
                         value: Any::new(
-                            encode(&PrintableString::from_bytes(domain).unwrap()).unwrap(),
+                            encode(&PrintableString::from_bytes(ipv4_or_domain_domain).unwrap())
+                                .unwrap(),
                         ),
                     },
                 ]))]);
@@ -468,7 +469,15 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                 OctetString::from(hash.to_vec())
             };
 
-            let key_usage = bitvec![u8, Msb0; 1];
+            let subject_alt_name =
+                match Ipv4Addr::from_str(str::from_utf8(ipv4_or_domain_domain).unwrap()) {
+                    Ok(ipv4) => SubjectAltName::from([GeneralName::IpAddress(OctetString::from(
+                        ipv4.octets(),
+                    ))]),
+                    Err(_) => SubjectAltName::from([GeneralName::DnsName(
+                        Ia5String::from_iso646_bytes(ipv4_or_domain_domain).unwrap(),
+                    )]),
+                };
 
             TbsCertificate {
                 version: Version::V3,
@@ -541,12 +550,7 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                         Extension {
                             extn_id: SUBJECT_ALT_NAME,
                             critical: false,
-                            extn_value: OctetString::from(
-                                encode(&SubjectAltName::from([GeneralName::DnsName(
-                                    Ia5String::from_iso646_bytes(domain).unwrap(),
-                                )]))
-                                .unwrap(),
-                            ),
+                            extn_value: OctetString::from(encode(&subject_alt_name).unwrap()),
                         },
                     ]
                     .into(),
