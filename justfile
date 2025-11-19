@@ -19,8 +19,9 @@ chain:
 	mkdir -p private
 	cd private
 	cargo run -- --seed root         root                                               DE Example example.org
-	cargo run -- --seed intermediate intermediate root-key.pem         root.pem         DE Example intermediate.example.org
+	cargo run -- --seed intermediate intermediate root-key.pem         root.pem         DE Example intermediate.example.org intermediate.example.org
 	cargo run -- --seed leaf         leaf         intermediate-key.pem intermediate.pem leaf.intermediate.example.org
+	openssl verify -trusted root.pem -trusted intermediate.pem leaf.pem
 
 lint: chain
 	zlint -pretty -summary private/root.pem private/intermediate.pem private/leaf.pem
