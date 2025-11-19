@@ -145,11 +145,6 @@ pub fn gen_root<R: CryptoRng + Rng>(
                 extensions: Some(
                     vec![
                         Extension {
-                            extn_id: KEY_USAGE,
-                            critical: true,
-                            extn_value: OctetString::from(encode(&key_usage).unwrap()),
-                        },
-                        Extension {
                             extn_id: BASIC_CONSTRAINTS,
                             critical: true,
                             extn_value: encode(&BasicConstraints {
@@ -158,6 +153,11 @@ pub fn gen_root<R: CryptoRng + Rng>(
                             })
                             .unwrap()
                             .into(),
+                        },
+                        Extension {
+                            extn_id: KEY_USAGE,
+                            critical: true,
+                            extn_value: OctetString::from(encode(&key_usage).unwrap()),
                         },
                         Extension {
                             extn_id: SUBJECT_KEY_IDENTIFIER,
@@ -314,6 +314,16 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
                 extensions: Some(
                     vec![
                         Extension {
+                            extn_id: BASIC_CONSTRAINTS,
+                            critical: true,
+                            extn_value: encode(&BasicConstraints {
+                                ca: true,
+                                path_len_constraint: Some(0.into()),
+                            })
+                            .unwrap()
+                            .into(),
+                        },
+                        Extension {
                             extn_id: KEY_USAGE,
                             critical: true,
                             extn_value: OctetString::from(encode(&key_usage).unwrap()),
@@ -326,16 +336,6 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
                                 CLIENT_AUTH,
                                 SERVER_AUTH,
                             ]))
-                            .unwrap()
-                            .into(),
-                        },
-                        Extension {
-                            extn_id: BASIC_CONSTRAINTS,
-                            critical: true,
-                            extn_value: encode(&BasicConstraints {
-                                ca: true,
-                                path_len_constraint: Some(0.into()),
-                            })
                             .unwrap()
                             .into(),
                         },
@@ -502,6 +502,21 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                 subject_unique_id: None,
                 extensions: Some(
                     vec![
+                        // If the basic constraints extension is not present in a version 3 certificate,
+                        // or the extension is present but the cA boolean is not asserted, then the certified
+                        // public key MUST NOT be used to verify certificate signatures.
+                        /*
+                        Extension {
+                            extn_id: BASIC_CONSTRAINTS,
+                            critical: true,
+                            extn_value: encode(&BasicConstraints {
+                                ca: false,
+                                path_len_constraint: None,
+                            })
+                            .unwrap()
+                            .into(),
+                        },
+                        */
                         Extension {
                             extn_id: KEY_USAGE,
                             critical: true,
@@ -514,16 +529,6 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                                 SERVER_AUTH,
                                 CLIENT_AUTH,
                             ]))
-                            .unwrap()
-                            .into(),
-                        },
-                        Extension {
-                            extn_id: BASIC_CONSTRAINTS,
-                            critical: true,
-                            extn_value: encode(&BasicConstraints {
-                                ca: false,
-                                path_len_constraint: None,
-                            })
                             .unwrap()
                             .into(),
                         },
