@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 
 use bitvec::prelude::*;
-use chrono::{Local, TimeDelta};
+use chrono::{Local, SubsecRound, TimeDelta};
 use rand::{CryptoRng, Rng};
 use rasn::{
     der::encode,
     types::{
-        Any, BitString, Ia5String, Integer, IntegerType, ObjectIdentifier, OctetString, Open::Null,
-        PrintableString, SetOf,
+        Any, BitString, GeneralizedTime, Ia5String, Integer, IntegerType, ObjectIdentifier,
+        OctetString, Open::Null, PrintableString, SetOf,
     },
 };
 use rasn_pkix::{
@@ -66,15 +66,6 @@ pub fn gen_root<R: CryptoRng + Rng>(
 
     let cert = {
         let tbs_certificate = {
-            let validity = {
-                let now = Local::now();
-
-                Validity {
-                    not_before: Time::Utc(now.clone().into()),
-                    not_after: Time::Utc((now + TimeDelta::days(25 * 365)).into()),
-                }
-            };
-
             let subject = Name::RdnSequence(vec![
                 RelativeDistinguishedName::from(SetOf::from(vec![AttributeTypeAndValue {
                     r#type: COUNTRY_NAME,
@@ -140,7 +131,7 @@ pub fn gen_root<R: CryptoRng + Rng>(
                 },
                 // This certificate is self-signed.
                 issuer: subject.clone(),
-                validity,
+                validity: validity_now_plus_days(50 * 365),
                 subject,
                 subject_public_key_info: SubjectPublicKeyInfo {
                     algorithm: AlgorithmIdentifier {
@@ -227,15 +218,6 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
 
     let cert = {
         let tbs_certificate = {
-            let validity = {
-                let now = Local::now();
-
-                Validity {
-                    not_before: Time::Utc(now.clone().into()),
-                    not_after: Time::Utc((now + TimeDelta::days(25 * 365)).into()),
-                }
-            };
-
             let subject = Name::RdnSequence(vec![
                 RelativeDistinguishedName::from(SetOf::from(vec![AttributeTypeAndValue {
                     r#type: COUNTRY_NAME,
@@ -319,7 +301,7 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
                     parameters: Some(Any::new(encode(&Null).unwrap())),
                 },
                 issuer: root_cert.tbs_certificate.subject.clone(),
-                validity,
+                validity: validity_now_plus_days(25 * 365),
                 subject,
                 subject_public_key_info: SubjectPublicKeyInfo {
                     algorithm: AlgorithmIdentifier {
@@ -428,15 +410,6 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
 
     let cert = {
         let tbs_certificate = {
-            let validity = {
-                let now = Local::now();
-
-                Validity {
-                    not_before: Time::Utc(now.clone().into()),
-                    not_after: Time::Utc((now + TimeDelta::days(90)).into()),
-                }
-            };
-
             let subject =
                 Name::RdnSequence(vec![RelativeDistinguishedName::from(SetOf::from(vec![
                     AttributeTypeAndValue {
@@ -509,7 +482,7 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                     parameters: Some(Any::new(encode(&Null).unwrap())),
                 },
                 issuer: intermediate_cert.tbs_certificate.subject.clone(),
-                validity,
+                validity: validity_now_plus_days(30),
                 subject,
                 subject_public_key_info: SubjectPublicKeyInfo {
                     algorithm: AlgorithmIdentifier {
@@ -617,4 +590,18 @@ fn sign_tbs_certificate(key: &RsaPrivateKey, tbs_certificate: &TbsCertificate) -
     let signature = key.sign(Pkcs1v15Sign::new_unprefixed(), &data).unwrap();
 
     BitVec::from_vec(signature)
+}
+
+fn validity_now_plus_days(days: i64) -> Validity {
+    let now = Local::now();
+
+    Validity {
+        not_before: Time::Utc((now.clone() - TimeDelta::minutes(15)).into()),
+        // TODO: Is this fine? See <https://en.wikipedia.org/wiki/Year_2038_problem>.
+        not_after: Time::General(
+            GeneralizedTime::from(now + TimeDelta::days(days))
+                .fixed_offset()
+                .trunc_subsecs(0),
+        ),
+    }
 }
