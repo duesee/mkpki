@@ -459,6 +459,8 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                 OctetString::from(hash.to_vec())
             };
 
+            let key_usage = bitvec![u8, Msb0; 1, 0, 1];
+
             let subject_alt_name =
                 match Ipv4Addr::from_str(str::from_utf8(ipv4_or_domain_domain).unwrap()) {
                     Ok(ipv4) => SubjectAltName::from([GeneralName::IpAddress(OctetString::from(
