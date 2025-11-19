@@ -4,7 +4,7 @@ use bitvec::prelude::*;
 use chrono::{Local, SubsecRound, TimeDelta};
 use rand::{CryptoRng, Rng};
 use rasn::{
-    der::encode,
+    der::{decode, encode},
     types::{
         Any, BitString, GeneralizedTime, Ia5String, Integer, IntegerType, ObjectIdentifier,
         OctetString, Open::Null, PrintableString, SetOf,
@@ -258,22 +258,21 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
                 BitVec::from_vec(encode(&pk).unwrap())
             };
 
-            let akid = {
-                let hash = {
-                    let mut hasher = Sha256::new();
-                    hasher.update(
-                        encode(
-                            &root_cert
-                                .tbs_certificate
-                                .subject_public_key_info
-                                .subject_public_key,
-                        )
-                        .unwrap(),
-                    );
-                    hasher.finalize()
-                };
-
-                OctetString::from(hash.to_vec())
+            let akid: OctetString = {
+                decode(
+                    root_cert
+                        .tbs_certificate
+                        .extensions
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .find(|e| e.extn_id == SUBJECT_KEY_IDENTIFIER)
+                        .unwrap()
+                        .extn_value
+                        .clone()
+                        .as_ref(),
+                )
+                .unwrap()
             };
 
             let skid = {
@@ -441,22 +440,21 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
                 BitVec::from_vec(encode(&pk).unwrap())
             };
 
-            let akid = {
-                let hash = {
-                    let mut hasher = Sha256::new();
-                    hasher.update(
-                        encode(
-                            &intermediate_cert
-                                .tbs_certificate
-                                .subject_public_key_info
-                                .subject_public_key,
-                        )
-                        .unwrap(),
-                    );
-                    hasher.finalize()
-                };
-
-                OctetString::from(hash.to_vec())
+            let akid: OctetString = {
+                decode(
+                    intermediate_cert
+                        .tbs_certificate
+                        .extensions
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .find(|e| e.extn_id == SUBJECT_KEY_IDENTIFIER)
+                        .unwrap()
+                        .extn_value
+                        .clone()
+                        .as_ref(),
+                )
+                .unwrap()
             };
 
             let skid = {
