@@ -9,6 +9,7 @@ use rasn::{
         Any, BitString, GeneralizedTime, Ia5String, Integer, IntegerType, ObjectIdentifier,
         OctetString, Open::Null, PrintableString, SetOf,
     },
+    Codec,
 };
 use rasn_pkix::{
     AlgorithmIdentifier, AttributeTypeAndValue, AuthorityKeyIdentifier, BasicConstraints,
@@ -120,11 +121,7 @@ pub fn gen_root<R: CryptoRng + Rng>(
 
             TbsCertificate {
                 version: Version::V3,
-                serial_number: CertificateSerialNumber::try_from_bytes(
-                    &rng.r#gen::<[u8; 16]>(),
-                    rasn::Codec::Der,
-                )
-                .unwrap(),
+                serial_number: gen_random_serial_number(rng),
                 signature: AlgorithmIdentifier {
                     algorithm: SHA_256_WITH_RSA_ENCRYPTION,
                     parameters: Some(Any::new(encode(&Null).unwrap())),
@@ -290,11 +287,7 @@ pub fn gen_intermediate<R: CryptoRng + Rng>(
 
             TbsCertificate {
                 version: Version::V3,
-                serial_number: CertificateSerialNumber::try_from_bytes(
-                    &rng.r#gen::<[u8; 16]>(),
-                    rasn::Codec::Der,
-                )
-                .unwrap(),
+                serial_number: gen_random_serial_number(rng),
                 signature: AlgorithmIdentifier {
                     algorithm: SHA_256_WITH_RSA_ENCRYPTION,
                     parameters: Some(Any::new(encode(&Null).unwrap())),
@@ -479,11 +472,7 @@ pub fn gen_leaf<R: CryptoRng + Rng>(
 
             TbsCertificate {
                 version: Version::V3,
-                serial_number: CertificateSerialNumber::try_from_bytes(
-                    &rng.r#gen::<[u8; 16]>(),
-                    rasn::Codec::Der,
-                )
-                .unwrap(),
+                serial_number: gen_random_serial_number(rng),
                 signature: AlgorithmIdentifier {
                     algorithm: SHA_256_WITH_RSA_ENCRYPTION,
                     parameters: Some(Any::new(encode(&Null).unwrap())),
@@ -610,5 +599,51 @@ fn validity_now_plus_days(days: i64) -> Validity {
                 .fixed_offset()
                 .trunc_subsecs(0),
         ),
+    }
+}
+
+/// 4.1.2.2.  Serial Number
+///
+/// The serial number MUST be a positive integer assigned by the CA to
+/// each certificate.  It MUST be unique for each certificate issued by a
+/// given CA (i.e., the issuer name and serial number identify a unique
+/// certificate).  CAs MUST force the serialNumber to be a non-negative
+/// integer.
+///
+/// Given the uniqueness requirements above, serial numbers can be
+/// expected to contain long integers.  Certificate users MUST be able to
+/// handle serialNumber values up to 20 octets.  Conforming CAs MUST NOT
+/// use serialNumber values longer than 20 octets.
+///
+/// Note: Non-conforming CAs may issue certificates with serial numbers
+/// that are negative or zero.  Certificate users SHOULD be prepared to
+/// gracefully handle such certificates.
+fn gen_random_serial_number<R: CryptoRng + Rng>(rng: &mut R) -> CertificateSerialNumber {
+    let mut serial = loop {
+        let byte = rng.r#gen::<u8>();
+        if (byte & 0b10000000) == 0 {
+            break vec![byte];
+        }
+    };
+    serial.extend_from_slice(&rng.r#gen::<[u8; 15]>());
+
+    CertificateSerialNumber::try_from_bytes(&serial, Codec::Der).unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::SeedableRng;
+    use rasn::{der::encode, types::IntegerType};
+    use sha2::Digest;
+
+    #[test]
+    fn test_serial() {
+        let mut rng = rand_chacha::ChaCha8Rng::from_seed(sha2::Sha256::digest(b"TEST").into());
+
+        for _ in 1..=10 {
+            let s = super::gen_random_serial_number(&mut rng);
+            println!("{:?}", encode(&s).unwrap());
+            assert!(!s.is_negative());
+        }
     }
 }
